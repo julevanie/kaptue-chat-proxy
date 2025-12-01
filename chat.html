@@ -26,7 +26,7 @@
       console.log("Sto inviando il messaggio al proxy...");
 
       try {
-        const response = await fetch("https://kaptue-chat-proxy.vercel.app/chat", {
+        const response = await fetch("https://kaptue-chat-proxy.vercel.app/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message })
