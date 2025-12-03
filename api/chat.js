@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const userMessage = req.body.message;
 
   try {
-    const n8nResponse = await fetch("https://julevanie.app.n8n.cloud/webhook/081cff8e-9896-474b-8424-57178bb8b0a9", {
+    const n8nResponse = await fetch("https://julevanie.app.n8n.cloud/webhook/3e12c2cb-e8b1-442e-b55b-b4bfb6efc6f4", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: userMessage })
