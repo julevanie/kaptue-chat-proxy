@@ -1,72 +1,48 @@
-// index.js - semplice proxy per n8n chat (Node 18+)
-import express from 'express';
-import fetch from 'node-fetch'; // se il tuo host non lo fornisce, usa native fetch in Node 18+
-
-const app = express();
-app.use(express.json());
-
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL; // es: https://tuo.n8n.cloud/webhook/xxxxx/chat
-const N8N_BASIC_USER = process.env.N8N_BASIC_USER;
-const N8N_BASIC_PASS = process.env.N8N_BASIC_PASS;
-const PORT = process.env.PORT || 3000;
-
-if (!N8N_WEBHOOK_URL) {
-  console.error('Devi impostare N8N_WEBHOOK_URL env var');
-  process.exit(1);
-}
-
-// semplice rate limiting in memoria (modesto)
-const rateMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minuto
-const MAX_REQ_PER_WINDOW = 30;
-
-function isRateLimited(ip) {
-  const now = Date.now();
-  const entry = rateMap.get(ip) || {count:0, since: now};
-  if (now - entry.since > RATE_LIMIT_WINDOW_MS) {
-    entry.count = 0;
-    entry.since = now;
-  }
-  entry.count += 1;
-  rateMap.set(ip, entry);
-  return entry.count > MAX_REQ_PER_WINDOW;
-}
-
-app.post('/chat-proxy', async (req, res) => {
-  const ip = req.ip;
-  if (isRateLimited(ip)) {
-    return res.status(429).json({ error: 'Rate limit exceeded' });
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Only POST allowed" });
   }
 
-  // Basic validation & sanitization minima
-  const body = req.body;
-  if (!body || typeof body !== 'object') {
-    return res.status(400).json({ error: 'Bad request' });
+  const { message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "Missing message" });
   }
 
-  // OPTIONAL: qui potresti aggiungere controllo su payload (es. controllare metadata)
-  // Inoltra a n8n
-  const authHeader = N8N_BASIC_USER && N8N_BASIC_PASS
-    ? 'Basic ' + Buffer.from(`${N8N_BASIC_USER}:${N8N_BASIC_PASS}`).toString('base64')
-    : undefined;
+  // --- Basic Auth ---
+  const authHeader = "Basic " + Buffer.from("kaptueg@yahoo.fr:Dacambiare").toString("base64");
 
   try {
-    const r = await fetch(N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader ? { Authorization: authHeader } : {})
-      },
-      body: JSON.stringify(body),
-      // timeout etc. possono essere gestiti qui
-    });
+    const response = await fetch(
+      "https://julevanie.app.n8n.cloud/webhook/3e12c2cb-e8b1-442e-b55b-b4bfb6efc6f4",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": authHeader
+        },
+        body: JSON.stringify({ message })
+      }
+    );
 
-    const text = await r.text();
-    res.status(r.status).send(text);
-  } catch (err) {
-    console.error('Proxy error', err);
-    res.status(500).json({ error: 'Proxy error' });
+    const resultText = await response.text();
+
+    // provo a convertire in JSON
+    try {
+      const result = JSON.parse(resultText);
+
+      return res.status(200).json({
+        reply: result.reply || "⚠️ Nessuna risposta dal workflow n8n"
+      });
+
+    } catch (e) {
+      return res.status(500).json({
+        error: "La risposta del webhook NON è JSON",
+        raw: resultText
+      });
+    }
+
+  } catch (error) {
+    return res.status(500).json({ error: "Proxy error", details: error });
   }
-});
-
-app.listen(PORT, () => console.log('Chat proxy listening on', PORT));
+}
